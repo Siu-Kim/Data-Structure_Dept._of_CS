@@ -1,0 +1,228 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+struct AVLNode;
+typedef struct AVLNode *Position;
+typedef struct AVLNode *AVLTree;
+typedef int ElementType;
+
+typedef struct AVLNode {
+    ElementType element;
+    AVLTree left, right;
+    int height;
+}AVLNode;
+
+int max(int num1, int num2); // 나중에 수정
+int Height(Position p);
+AVLTree Insert(ElementType X, AVLTree T);
+AVLTree Delete(ElementType X, AVLTree T);
+Position SingleRotateWithLeft(Position node);
+Position SingleRotateWithRight(Position node);
+Position DoubleRotateWithLeft(Position node);
+Position DoubleRotateWithRight(Position node);
+void PrintInorder(AVLTree T);
+void DeleteTree(AVLTree T);
+AVLTree InorderSucc(AVLTree node);
+int findNode(AVLTree node, int key);
+
+FILE *fin;
+FILE *fout;
+
+int temporary = 1; //printInorder 에서 쓰이는 변수임. 첫번째 출력을 공백 없이 진행하기 위해서 도입
+int main(int argc, char *argv[]){
+    fin = fopen(argv[1], "r");
+    fout = fopen(argv[2], "w");
+    AVLTree Tree = NULL;
+    char cv;
+    int key;
+
+    while(!feof(fin)){
+        fscanf(fin, "%c", &cv);
+        switch(cv){
+            case 'i':
+                fscanf(fin, "%d\n", &key);
+                Tree = Insert(key, Tree);
+                break;
+            case 'd':
+                fscanf(fin, "%d\n", &key);
+                if(findNode(Tree, key)){
+                    Tree = Delete(key, Tree);
+                }else{
+                    fprintf(fout, "deletion error : %d is not in the tree\n", key);
+                }
+                break;
+        }
+        PrintInorder(Tree);
+        temporary = 1;
+        fprintf(fout, "\n");
+    }
+    DeleteTree(Tree);
+    fclose(fin);
+    fclose(fout);
+
+    return 0;
+}
+
+int max(int num1, int num2){
+    if(num1 >= num2){
+        return num1;
+    }else{
+        return num2;
+    }
+}
+
+int Height(Position p) {
+    if(p == NULL) {
+        return -1;
+    }
+    return p->height;
+}
+
+AVLTree Insert(ElementType X, AVLTree T) {
+    if(T == NULL){ //노드를 넣을 장소를 찾음
+        T = malloc(sizeof(struct AVLNode));
+        assert(T != NULL);
+        T -> element = X;
+        T -> height = 0;
+        T -> left = T -> right = NULL;
+    }else if(X < T -> element) {
+        T -> left = Insert(X, T -> left); //BST 때와 동일함
+        if(Height(T -> left) - Height(T -> right) >= 2) {
+            if(X < T -> left -> element) { //LL의 경우
+                T = SingleRotateWithLeft(T);
+            }else{ //LR의 경우
+                T = DoubleRotateWithLeft(T);
+            }
+        }
+    }else if(X > T -> element){
+        T -> right = Insert(X, T -> right); //BST 때와 동일함
+        if(Height(T -> right) - Height(T -> left) >= 2) { //오른쪽 서브트리와 왼쪽 서브트리의 높이차가 2 이상이라면
+            if(X > T -> right -> element) { //RR의 경우
+                T = SingleRotateWithRight(T);
+            }else{ //RL의 경우
+                T = DoubleRotateWithRight(T);
+            }
+        }
+    }else {
+        fprintf(fout, "insertion error : %d is already in the tree\n", X);
+    }
+    T -> height = max(Height(T -> left), Height(T -> right)) + 1; //노드를 추가한 뒤에 높이를 다시 변경
+    return T; //최종적으로 루트 노드를 반환
+}
+
+AVLTree Delete(ElementType X, AVLTree T){ //재귀 탈출하면서 높이 비교
+    AVLTree tmp;
+    if(X < T -> element){
+        T -> left = Delete(X, T -> left);
+        if(Height(T -> left) - Height(T -> right) >= 2) {
+            if(X < T -> left -> element) { //LL의 경우
+                T = SingleRotateWithLeft(T);
+            }else{ //LR의 경우
+                T = DoubleRotateWithLeft(T);
+            }
+        }
+    }else if(X > T -> element){
+        T -> right = Delete(X, T -> right);
+        if(Height(T -> right) - Height(T -> left) >= 2) { //오른쪽 서브트리와 왼쪽 서브트리의 높이차가 2 이상이라면
+            if(X > T -> right -> element) { //RR의 경우
+                T = SingleRotateWithRight(T);
+            }else{ //RL의 경우
+                T = DoubleRotateWithRight(T);
+            }
+        }
+    }else if(T -> left != NULL && T -> right != NULL){ //child가 2인 경우
+        tmp = InorderSucc(T); //오른쪽 subtree의 가장 작은 값으로 바꾼 후
+        T -> element = tmp -> element;
+        T -> right = Delete(T -> element, T -> right); //그 값을 찾아 삭제
+    }else{ //child가 0 또는 1인 경우
+        tmp = T;
+        if(T -> left == NULL){ //왼쪽 자식이 없는 경우
+            T = T -> right;
+        }else{ //오른쪽 자식이 없는 경우
+            T = T -> left;
+        }
+        free(tmp);
+    }
+    if(T != NULL){
+        T -> height = max(Height(T -> left), Height(T -> right)) + 1; //노드를 추가한 뒤에 높이를 다시 변경, NULL일 경우 T->height가 없으므로 if문 처리
+    }
+    return T;
+}
+
+Position SingleRotateWithLeft(Position k2) { //LL의 경우
+    Position k1;
+    k1 = k2 -> left;
+    k2 -> left = k1 -> right;
+    k1 -> right = k2;
+    k2 -> height = max(Height(k2 -> left), Height(k2 -> right)) + 1; //rotate 후에 k2 높이를 다시 설정
+    k1 -> height = max(Height(k1 -> left), k2 -> height) + 1; //rotate 후에 k1 높이를 다시 설정
+    return k1;
+}
+
+Position SingleRotateWithRight(Position k2){ //RR의 경우
+    Position k1;
+    k1 = k2 -> right;
+    k2 -> right = k1 -> left;
+    k1 -> left = k2;
+    k2 -> height = max(Height(k2 -> left), Height(k2 -> right)) + 1; //rotate 후에 k2 높이를 다시 설정
+    k1 -> height = max(Height(k1 -> right), k2 -> height) + 1; //rotate 후에 k1 높이를 다시 설정
+    return k1;
+}
+
+Position DoubleRotateWithLeft(Position k3) {
+    k3 -> left = SingleRotateWithRight(k3 -> left); //LL모양으로 만듦
+    return SingleRotateWithLeft(k3); //rotate 후에 반환
+}
+
+Position DoubleRotateWithRight(Position k3) {
+    k3 -> right = SingleRotateWithLeft(k3 -> right); //RR모양으로 만듦
+    return SingleRotateWithRight(k3); //rotate 후에 반환
+}
+
+void PrintInorder(AVLTree T){ //inorder로 출력
+    if(T == NULL){
+        return;
+    }
+    PrintInorder(T -> left);
+    if(temporary == 1){
+        fprintf(fout, "%d(%d)", T -> element, Height(T));
+        temporary--;
+    }else{
+        fprintf(fout, " %d(%d)", T -> element, Height(T));
+    }
+    PrintInorder(T -> right);
+}
+
+void DeleteTree(AVLTree T){
+    if(T == NULL){
+         return;
+     }
+     DeleteTree(T->left);
+     DeleteTree(T->right);
+     free(T);
+}
+
+AVLTree InorderSucc(AVLTree root){ //오른쪽 subTree의 가장 왼쪽 노드를 반환
+    root = root->right;
+    while(1){
+        if(root->left == NULL){
+            break;
+        }
+        root = root->left;
+    }
+    return root;
+}
+
+int findNode(AVLTree root, int key){
+    if(root == NULL){
+        return 0; //key에 대한 노드가 없다면 0을 반환
+    }
+    if(key < root -> element){
+        findNode(root -> left, key);
+    }else if(key > root -> element){
+        findNode(root -> right, key);
+    }else{
+        return 1; //key에 대한 노드가 있다면 1을 반환
+    }
+}

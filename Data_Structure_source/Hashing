@@ -1,0 +1,213 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+
+FILE *fin;
+FILE *fout;
+
+typedef int ElementType;
+typedef ElementType List;
+typedef struct HashTbl* HashTable;
+
+typedef struct HashTbl{
+    int TableSize;
+    List *TheLists;
+}HashTbl;
+
+HashTable createTable(int TableSize);
+void Insert(HashTable H, ElementType Key, int solution);
+void Delete(HashTable H, ElementType Key, int solution);
+int Find(HashTable H, ElementType Key, int solution);
+int IsFull(HashTable H);
+void printTable(HashTable H);
+void deleteTable(HashTable H);
+
+int main(int argc, char *argv[]){
+    fin = fopen(argv[1], "r");
+    fout = fopen(argv[2], "w");
+
+
+    char solution_str[20];
+    int solution, TableSize;
+
+    fscanf(fin, "%s", solution_str);
+    if(!strcmp(solution_str, "linear"))
+        solution = 1;
+    else if(!strcmp(solution_str, "quadratic"))
+        solution = 2;
+    else{
+        fprintf(fout, "error: invalid hashing solution!");
+        return 0;
+    }
+
+    fscanf(fin, "%d", &TableSize);
+
+    HashTable H = createTable(TableSize);
+
+    char cv;
+    int key;
+    while(EOF != fscanf(fin, "%c", &cv)){
+        switch(cv){
+            case 'i':
+                fscanf(fin, "%d", &key);
+                Insert(H, key, solution);
+                break;
+
+            case 'f':
+                fscanf(fin, "%d", &key);
+                int result = Find(H, key, solution);
+                if(result)
+                    fprintf(fout, "%d is in the table\n", key);
+                else
+                    fprintf(fout, "%d is not in the table\n", key);
+                break;
+
+            case 'd':
+                fscanf(fin, "%d", &key);
+                Delete(H, key, solution);
+                break;
+           
+            case 'p':
+                printTable(H);
+                break;
+        }
+    }
+
+    deleteTable(H);
+
+    return 0;
+}
+
+
+HashTable createTable(int TableSize){
+    HashTable H = malloc(sizeof(struct HashTbl));
+    H->TableSize = TableSize;
+    H->TheLists = malloc(sizeof(int) * TableSize);
+    for(int i = 0; i < TableSize; i++){
+        H->TheLists[i] = 0; //다 0으로 초기화
+    }
+    return H;
+}
+
+void Insert(HashTable H, ElementType Key, int solution){
+    int i = 0;
+    int startpos = Key % H->TableSize;
+
+    if(IsFull(H)){ //hash table이 꽉 차있을 경우
+        fprintf(fout, "insertion error : table is full\n");
+        return;
+    }
+
+    if(Find(H, Key, solution)){ //insert하려는 값이 이미 있을 경우
+        int address;
+        for(int k = 0; k < H->TableSize; k++){
+            if(H->TheLists[k] == Key){
+                address = k;
+                break;
+            }
+        }
+        fprintf(fout, "insertion error : %d already exists at address %d\n", Key, address);
+        return;
+    }
+
+    if(solution == 1){
+        while(1){
+            if(H->TheLists[(i+Key)%(H->TableSize)] == 0 || H->TheLists[(i+Key)%(H->TableSize)] == -1){ //0이거나 -1이면 insert
+                H->TheLists[(i+Key)%(H->TableSize)] = Key;
+                fprintf(fout, "insert %d into address %d\n", Key, (i+Key)%(H->TableSize));
+                return;
+            }
+            i++;
+        }
+    }else if(solution == 2){
+        while(1){
+            if(H->TheLists[(i*i+Key)%(H->TableSize)] == 0 || H->TheLists[(i*i+Key)%(H->TableSize)] == -1){ //0이거나 -1이면 insert
+                H->TheLists[(i*i+Key)%(H->TableSize)] = Key;
+                fprintf(fout, "insert %d into address %d\n", Key, (i*i+Key)%(H->TableSize));
+                return;
+            }
+            i++;
+        }
+    }
+}
+
+void Delete(HashTable H, ElementType Key, int solution){
+    if(!Find(H, Key, solution)){ //지우려는 값이 없을 경우
+        fprintf(fout, "deletion error : %d is not in the table\n", Key);
+        return;
+    }
+    int i = 0;
+    if(solution == 1){
+        while(1){
+            if(H->TheLists[(i+Key)%(H->TableSize)] == Key){ //Key를 찾으면 삭제
+                H->TheLists[(i+Key)%(H->TableSize)] = -1;
+                fprintf(fout, "delete %d\n", Key);
+                return;
+            }
+            i++;
+        }
+    }else if(solution == 2){
+        while(1){
+            if(H->TheLists[(i*i+Key)%(H->TableSize)] == Key){ //Key를 찾으면 삭제
+                H->TheLists[(i*i+Key)%(H->TableSize)] = -1;
+                fprintf(fout, "delete %d\n", Key);
+                return;
+            }
+            i++;
+        }
+    }
+}
+int Find(HashTable H, ElementType Key, int solution){
+    int i = 0;
+    int startpos = Key % H->TableSize;
+    if(solution == 1){
+        while(1){
+            if(i == H->TableSize){ //한바퀴 다 돌았을 때
+                return 0;
+            }
+            if(H->TheLists[(i+Key)%(H->TableSize)] == 0){ //값이 존재하지 않음
+                return 0;
+            }else if(H->TheLists[(i+Key)%(H->TableSize)] == Key){ //찾음
+                return 1;
+            }
+            i++;
+        }
+    }else if(solution == 2){
+        while(1){
+            if(i == H->TableSize){ //한바퀴 다 돌았을 때
+                return 0;
+            }
+            if(H->TheLists[(i*i+Key)%(H->TableSize)] == 0){ //값이 존재하지 않음
+                return 0;
+            }else if(H->TheLists[(i*i+Key)%(H->TableSize)] == Key){ //찾음
+                return 1;
+            }
+            i++;
+        }
+    }
+}
+
+int IsFull(HashTable H){ //HashTable이 꽉찼는지 확인
+    for(int i = 0; i < H->TableSize; i++){
+        if(H->TheLists[i] == 0 || H->TheLists[i] == -1){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void printTable(HashTable H){ //Hash table 값들을 쭉 출력
+    for(int i = 0; i < H->TableSize; i++){
+        if(H->TheLists[i] == -1){ //delete 함수 때문에 -1값은 0으로 바꿔 출력
+            fprintf(fout, "0 ");
+        }else{
+            fprintf(fout, "%d ", H->TheLists[i]);
+        }
+    }
+    fprintf(fout, "\n");
+}
+
+void deleteTable(HashTable H){ //free
+    free(H->TheLists);
+    free(H);
+}
